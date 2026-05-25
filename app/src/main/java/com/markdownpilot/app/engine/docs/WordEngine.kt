@@ -200,7 +200,7 @@ class WordEngine @Inject constructor(@ApplicationContext private val ctx: Contex
             style = "Heading2"
             spacingBefore = 240
             spacingAfter = 100
-            keepNext = true
+            setKeepNext(true)
         }
         p.createRun().apply {
             setText(text)

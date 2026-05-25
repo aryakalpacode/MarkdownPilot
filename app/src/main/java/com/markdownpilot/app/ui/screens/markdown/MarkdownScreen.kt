@@ -77,7 +77,7 @@ fun MarkdownScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Default.EditDocument, null) },
+                    icon = { Icon(Icons.Default.Edit, null) },
                     text = { Text("Workshop") }
                 )
                 Tab(
