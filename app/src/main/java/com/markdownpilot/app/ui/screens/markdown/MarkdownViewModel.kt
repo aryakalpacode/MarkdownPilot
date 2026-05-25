@@ -137,6 +137,18 @@ class MarkdownViewModel @Inject constructor(
         } catch (_: Exception) {}
     }
 
+    fun deleteFile(entity: GeneratedFileEntity) {
+        viewModelScope.launch {
+            try {
+                val file = File(entity.filePath)
+                if (file.exists()) {
+                    file.delete()
+                }
+            } catch (_: Exception) {}
+            fileDao.deleteById(entity.id)
+        }
+    }
+
     fun loadSample(sample: String) {
         _markdownText.value = sample
     }
@@ -167,10 +179,10 @@ Below is the verified revenue report for the continental divisions. These metric
 
 | Quarter | North America | Europe | Asia-Pacific |
 |:---|:---|:---|:---|
-| Q1 Revenue | $2.4M | $1.8M | $1.2M |
-| Q2 Revenue | $3.1M | $2.2M | $1.5M |
-| Q3 Revenue | $3.8M | $2.9M | $1.9M |
-| Q4 Revenue | $4.5M | $3.4M | $2.2M |
+| Q1 Revenue | ${'$'}2.4M | ${'$'}1.8M | ${'$'}1.2M |
+| Q2 Revenue | ${'$'}3.1M | ${'$'}2.2M | ${'$'}1.5M |
+| Q3 Revenue | ${'$'}3.8M | ${'$'}2.9M | ${'$'}1.9M |
+| Q4 Revenue | ${'$'}4.5M | ${'$'}3.4M | ${'$'}2.2M |
 
 ---
 
