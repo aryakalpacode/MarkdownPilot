@@ -102,7 +102,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
         for (section in plan.sections) {
             // Check page boundary
             if (y > PAGE_H - margin - 50) {
-                drawPageDecorations(canvas, pageNum, style, smallPaint, dividerPaint)
+                drawPageDecorations(canvas, pageNum, config, smallPaint, dividerPaint)
                 doc.finishPage(page)
                 pageNum++
                 page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
@@ -117,7 +117,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
 
             // Force Pagebreak if configured before H2 headings
             if (config.enablePageBreaksBeforeH2 && section.heading.isNotBlank() && y > margin + 100f) {
-                drawPageDecorations(canvas, pageNum, style, smallPaint, dividerPaint)
+                drawPageDecorations(canvas, pageNum, config, smallPaint, dividerPaint)
                 doc.finishPage(page)
                 pageNum++
                 page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
@@ -132,7 +132,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
 
             when (section.type) {
                 "pagebreak" -> {
-                    drawPageDecorations(canvas, pageNum, style, smallPaint, dividerPaint)
+                    drawPageDecorations(canvas, pageNum, config, smallPaint, dividerPaint)
                     doc.finishPage(page)
                     pageNum++
                     page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
@@ -156,7 +156,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                                 val items = section.content.split("\n").filter { it.isNotBlank() }
                                 for (item in items) {
                                     if (y > PAGE_H - margin - 25) {
-                                        drawPageDecorations(canvas, pageNum, style, smallPaint, dividerPaint)
+                                        drawPageDecorations(canvas, pageNum, config, smallPaint, dividerPaint)
                                         doc.finishPage(page); pageNum++
                                         page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                                         canvas = page.canvas; canvas.drawColor(bgColor); y = margin
@@ -170,7 +170,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                                 val items = section.content.split("\n").filter { it.isNotBlank() }
                                 for ((idx, item) in items.withIndex()) {
                                     if (y > PAGE_H - margin - 25) {
-                                        drawPageDecorations(canvas, pageNum, style, smallPaint, dividerPaint)
+                                        drawPageDecorations(canvas, pageNum, config, smallPaint, dividerPaint)
                                         doc.finishPage(page); pageNum++
                                         page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                                         canvas = page.canvas; canvas.drawColor(bgColor); y = margin
@@ -188,7 +188,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                                     blockHeight += measureTextLinesHeight(l, italicPaint, contentW - 24f, config.lineSpacing) + 3f
                                 }
                                 if (y + blockHeight + 16f > PAGE_H - margin) {
-                                    drawPageDecorations(canvas, pageNum, style, smallPaint, dividerPaint)
+                                    drawPageDecorations(canvas, pageNum, config, smallPaint, dividerPaint)
                                     doc.finishPage(page); pageNum++
                                     page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                                     canvas = page.canvas; canvas.drawColor(bgColor); y = margin
@@ -215,7 +215,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                                     blockHeight += measureTextLinesHeight(l, codePaint, contentW - 20f, 1.2f) + 3f
                                 }
                                 if (y + blockHeight + 16f > PAGE_H - margin) {
-                                    drawPageDecorations(canvas, pageNum, style, smallPaint, dividerPaint)
+                                    drawPageDecorations(canvas, pageNum, config, smallPaint, dividerPaint)
                                     doc.finishPage(page); pageNum++
                                     page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                                     canvas = page.canvas; canvas.drawColor(bgColor); y = margin
@@ -234,7 +234,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                             }
                             else -> {
                                 // Paragraph
-                                val result = drawWrappedTextMultiPage(doc, canvas, page, pageNum, style,
+                                val result = drawWrappedTextMultiPage(doc, canvas, page, pageNum, config,
                                     section.content, bodyPaint, margin, y, contentW, dividerPaint, smallPaint)
                                 canvas = result.canvas; page = result.page; pageNum = result.pageNum; y = result.y
                             }
@@ -246,7 +246,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                     if (section.heading.isNotBlank()) {
                         y += 10f; y = drawWrappedText(canvas, section.heading, headingPaint, margin, y, contentW, config.lineSpacing); y += 6f
                     }
-                    val result = drawTable(doc, canvas, page, pageNum, style, section.tableData, margin, y, dividerPaint, smallPaint)
+                    val result = drawTable(doc, canvas, page, pageNum, config, section.tableData, margin, y, dividerPaint, smallPaint)
                     canvas = result.canvas; page = result.page; pageNum = result.pageNum; y = result.y
                     y += 15f
                 }
@@ -259,7 +259,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
 
                     if (imgBytes != null) {
                         if (y > PAGE_H - margin - 220) {
-                            drawPageDecorations(canvas, pageNum, style, smallPaint, dividerPaint)
+                            drawPageDecorations(canvas, pageNum, config, smallPaint, dividerPaint)
                             doc.finishPage(page); pageNum++
                             page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                             canvas = page.canvas; canvas.drawColor(bgColor); y = margin
@@ -275,7 +275,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
             }
         }
 
-        drawPageDecorations(canvas, pageNum, style, smallPaint, dividerPaint)
+        drawPageDecorations(canvas, pageNum, config, smallPaint, dividerPaint)
         doc.finishPage(page)
 
         // Save
@@ -372,7 +372,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                 val test = if (line.isEmpty()) word else "$line $word"
                 if (paint.measureText(test) > maxW && line.isNotEmpty()) {
                     if (y > PAGE_H - margin - 25) {
-                        drawPageDecorations(canvas, pageNum, style, labelPaint, linePaint)
+                        drawPageDecorations(canvas, pageNum, config, labelPaint, linePaint)
                         doc.finishPage(page); pageNum++
                         page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                         canvas = page.canvas; canvas.drawColor(bgColor); y = margin
@@ -387,7 +387,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
             }
             if (line.isNotBlank()) {
                 if (y > PAGE_H - margin - 25) {
-                    drawPageDecorations(canvas, pageNum, style, labelPaint, linePaint)
+                    drawPageDecorations(canvas, pageNum, config, labelPaint, linePaint)
                     doc.finishPage(page); pageNum++
                     page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                     canvas = page.canvas; canvas.drawColor(bgColor); y = margin
@@ -425,7 +425,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
 
         for ((rowIdx, row) in data.withIndex()) {
             if (y + rowH > PAGE_H - margin) {
-                drawPageDecorations(canvas, pageNum, style, labelPaint, linePaint)
+                drawPageDecorations(canvas, pageNum, config, labelPaint, linePaint)
                 doc.finishPage(page); pageNum++
                 page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                 canvas = page.canvas; canvas.drawColor(bgColor); y = margin
