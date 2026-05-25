@@ -1,0 +1,236 @@
+package com.markdownpilot.app.engine.docs
+
+import android.content.Context
+import com.markdownpilot.app.domain.model.DocSection
+import com.markdownpilot.app.domain.model.DocStyleConfig
+import com.markdownpilot.app.domain.model.DocumentPlan
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.*
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/** Handles CSV, HTML, Markdown, JSON, and ZIP output with custom styling configurations. */
+@Singleton
+class TextDocEngine @Inject constructor(@ApplicationContext private val ctx: Context) {
+
+    fun generateCsv(plan: DocumentPlan): String {
+        val sb = StringBuilder()
+        for (sec in plan.sections) {
+            if (sec.type == "table" && sec.tableData.isNotEmpty()) {
+                for (row in sec.tableData) {
+                    sb.appendLine(row.joinToString(",") { "\"${it.replace("\"", "\"\"")}\"" })
+                }
+                sb.appendLine()
+            }
+        }
+        if (sb.isBlank()) {
+            sb.appendLine("Title,${plan.title}")
+            for (sec in plan.sections) {
+                if (sec.content.isNotBlank()) sb.appendLine("\"${sec.heading}\",\"${sec.content.take(500).replace("\n", " ")}\"")
+            }
+        }
+        return saveFile(plan.title, "csv", sb.toString())
+    }
+
+    fun generateHtml(
+        plan: DocumentPlan,
+        images: Map<String, ByteArray> = emptyMap(),
+        style: DocStyleConfig = DocStyleConfig()
+    ): String {
+        val primaryHex = style.primaryColorHex
+        val secondaryHex = style.secondaryColorHex
+        val textHex = style.textColorHex
+        val bgHex = style.backgroundColorHex
+        
+        val fontFamilyCss = when (style.fontFamily) {
+            "Serif" -> "Georgia, serif"
+            "Monospace" -> "Courier New, monospace"
+            else -> "Segoe UI, -apple-system, system-ui, sans-serif"
+        }
+
+        val paddingCss = when {
+            style.marginSize <= 35f -> "20px 10px"
+            style.marginSize >= 65f -> "60px 40px"
+            else -> "40px 20px"
+        }
+
+        val sb = StringBuilder()
+        sb.appendLine("""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">""")
+        sb.appendLine("""<title>${plan.title}</title><style>
+            body{font-family:$fontFamilyCss;max-width:900px;margin:0 auto;padding:$paddingCss;color:$textHex;background-color:$bgHex;line-height:${style.lineSpacing}}
+            h1{color:$primaryHex;border-bottom:3px solid $primaryHex;padding-bottom:12px;margin-bottom:8px}
+            h2{color:$primaryHex;margin-top:35px;border-left:4px solid $secondaryHex;padding-left:10px}
+            h3{color:$secondaryHex;margin-top:25px}
+            table{width:100%;border-collapse:collapse;margin:24px 0;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+            th{background:$primaryHex;color:#fff;padding:12px 16px;text-align:left;font-weight:600}
+            td{padding:10px 16px;border-bottom:1px solid #e2e8f0}
+            ${if (style.tableStyle == "Striped") "tr:nth-child(even){background:#f8fafc}" else ""}
+            .meta{color:#64748b;font-size:0.92em;margin-bottom:32px;font-style:italic}
+            blockquote{border-left:4px solid $primaryHex;background-color:#f8fafc;padding:12px 20px;margin:20px 0;color:#475569;font-style:italic;border-radius:0 6px 6px 0}
+            pre{background:#f1f5f9;color:#1e293b;padding:16px;border-radius:8px;overflow-x:auto;font-family:Courier New, monospace;font-size:0.95em;border:1px solid #e2e8f0}
+            code{font-family:Courier New, monospace;font-size:0.95em;background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#0f172a}
+            pre code{background:transparent;padding:0;color:inherit;border-radius:0}
+            .chart-bar{display:flex;align-items:end;gap:12px;padding:24px;background:#f8fafc;border-radius:8px;margin:24px 0;border:1px solid #e2e8f0}
+            .bar{background:linear-gradient($primaryHex, $secondaryHex);border-radius:6px 6px 0 0;min-width:44px;text-align:center;color:#fff;font-size:0.8em;padding-top:4px}
+            .bar-label{text-align:center;font-size:0.8em;color:#64748b;margin-top:6px;font-weight:500}
+            img{max-width:100%;border-radius:8px;margin:20px 0;box-shadow:0 4px 6px rgba(0,0,0,.05)}
+            ul,ol{padding-left:24px;margin:16px 0}
+            li{margin:6px 0}
+            @media print {
+                body { padding: 0; background: #fff; }
+                .pagebreak { page-break-after: always; }
+            }
+        </style></head><body>""")
+        
+        sb.appendLine("<h1>${plan.title}</h1>")
+        val dateStr = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault()).format(Date())
+        sb.appendLine("""<p class="meta">Generated by MarkdownPilot AI • $dateStr</p>""")
+
+        for (sec in plan.sections) {
+            when (sec.type) {
+                "text" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("<h2>${sec.heading}</h2>")
+                    sec.content.split("\n\n").forEach { sb.appendLine("<p>${it.trim()}</p>") }
+                }
+                "bullet_list" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("<h2>${sec.heading}</h2>")
+                    sb.appendLine("<ul>")
+                    sec.content.split("\n").filter { it.isNotBlank() }.forEach { sb.appendLine("<li>${it.trim()}</li>") }
+                    sb.appendLine("</ul>")
+                }
+                "numbered_list" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("<h2>${sec.heading}</h2>")
+                    sb.appendLine("<ol>")
+                    sec.content.split("\n").filter { it.isNotBlank() }.forEach { sb.appendLine("<li>${it.trim()}</li>") }
+                    sb.appendLine("</ol>")
+                }
+                "quote" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("<h2>${sec.heading}</h2>")
+                    sb.appendLine("<blockquote>${sec.content.replace("\n", "<br>")}</blockquote>")
+                }
+                "code" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("<h2>${sec.heading}</h2>")
+                    sb.appendLine("<pre><code>${sec.content}</code></pre>")
+                }
+                "table" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("<h2>${sec.heading}</h2>")
+                    sb.appendLine("<table>")
+                    for ((i, row) in sec.tableData.withIndex()) {
+                        sb.append("<tr>")
+                        val tag = if (i == 0) "th" else "td"
+                        row.forEach { sb.append("<$tag>$it</$tag>") }
+                        sb.appendLine("</tr>")
+                    }
+                    sb.appendLine("</table>")
+                }
+                "chart" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("<h2>${sec.heading}</h2>")
+                    val maxVal = sec.chartData.values.maxOrNull() ?: 1.0
+                    sb.appendLine("""<div class="chart-bar" style="height:250px">""")
+                    sec.chartData.forEach { (k, v) ->
+                        val h = (v / maxVal * 190).toInt()
+                        sb.appendLine("""<div style="flex:1;text-align:center"><div class="bar" style="height:${h}px">${formatNum(v)}</div><div class="bar-label">$k</div></div>""")
+                    }
+                    sb.appendLine("</div>")
+                }
+                "image" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("<h2>${sec.heading}</h2>")
+                    val key = sec.imageQuery.ifBlank { sec.imageUrl }
+                    val bytes = images[key]
+                    if (bytes != null) {
+                        val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                        sb.appendLine("""<img src="data:image/jpeg;base64,$b64" alt="${sec.heading}">""")
+                    }
+                }
+                "pagebreak" -> sb.appendLine("""<div class="pagebreak"></div>""")
+            }
+        }
+        sb.appendLine("</body></html>")
+        return saveFile(plan.title, "html", sb.toString())
+    }
+
+    fun generateMarkdown(plan: DocumentPlan): String {
+        val sb = StringBuilder()
+        sb.appendLine("# ${plan.title}\n")
+        for (sec in plan.sections) {
+            when (sec.type) {
+                "text" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("## ${sec.heading}\n")
+                    if (sec.content.isNotBlank()) sb.appendLine("${sec.content}\n")
+                }
+                "bullet_list" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("## ${sec.heading}\n")
+                    sec.content.split("\n").filter { it.isNotBlank() }.forEach { sb.appendLine("- ${it.trim()}") }
+                    sb.appendLine()
+                }
+                "numbered_list" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("## ${sec.heading}\n")
+                    sec.content.split("\n").filter { it.isNotBlank() }.forEachIndexed { idx, item -> sb.appendLine("${idx + 1}. ${item.trim()}") }
+                    sb.appendLine()
+                }
+                "quote" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("## ${sec.heading}\n")
+                    sec.content.split("\n").forEach { sb.appendLine("> $it") }
+                    sb.appendLine()
+                }
+                "code" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("## ${sec.heading}\n")
+                    sb.appendLine("```")
+                    sb.appendLine(sec.content)
+                    sb.appendLine("```\n")
+                }
+                "table" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("## ${sec.heading}\n")
+                    if (sec.tableData.isNotEmpty()) {
+                        sb.appendLine("| ${sec.tableData[0].joinToString(" | ")} |")
+                        sb.appendLine("| ${sec.tableData[0].joinToString(" | ") { "---" }} |")
+                        sec.tableData.drop(1).forEach { row -> sb.appendLine("| ${row.joinToString(" | ")} |") }
+                        sb.appendLine()
+                    }
+                }
+                "chart" -> {
+                    if (sec.heading.isNotBlank()) sb.appendLine("## ${sec.heading}\n")
+                    sec.chartData.forEach { (k, v) -> sb.appendLine("- **$k**: ${formatNum(v)}") }
+                    sb.appendLine()
+                }
+            }
+        }
+        return saveFile(plan.title, "md", sb.toString())
+    }
+
+    /** Bundle multiple files into a ZIP. */
+    fun createZip(filePaths: List<String>, zipName: String): String {
+        val dir = File(ctx.filesDir, "documents").apply { mkdirs() }
+        val zipFile = File(dir, "$zipName.zip")
+        ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
+            for (path in filePaths) {
+                val file = File(path)
+                if (file.exists()) {
+                    zos.putNextEntry(ZipEntry(file.name))
+                    file.inputStream().use { it.copyTo(zos) }
+                    zos.closeEntry()
+                }
+            }
+        }
+        return zipFile.absolutePath
+    }
+
+    private fun saveFile(title: String, ext: String, content: String): String {
+        val dir = File(ctx.filesDir, "documents").apply { mkdirs() }
+        val name = "${title.replace(Regex("[^a-zA-Z0-9 ]"), "").replace(" ", "_").take(30).ifBlank { "Document" }}.$ext"
+        val file = File(dir, name)
+        file.writeText(content)
+        return file.absolutePath
+    }
+
+    private fun formatNum(d: Double): String =
+        if (d >= 1_000_000) String.format("%.1fM", d / 1_000_000)
+        else if (d >= 1_000) String.format("%.0fK", d / 1_000)
+        else if (d == d.toLong().toDouble()) d.toLong().toString()
+        else String.format("%.1f", d)
+}
