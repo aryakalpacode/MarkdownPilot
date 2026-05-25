@@ -36,19 +36,19 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
     fun generate(
         plan: DocumentPlan,
         images: Map<String, ByteArray> = emptyMap(),
-        style: DocStyleConfig = DocStyleConfig()
+        config: DocStyleConfig = DocStyleConfig()
     ): String {
         val doc = PdfDocument()
         var pageNum = 1
         
         // Colors
-        val primaryColor = Color.parseColor(style.primaryColorHex)
-        val secondaryColor = Color.parseColor(style.secondaryColorHex)
-        val textColor = Color.parseColor(style.textColorHex)
-        val bgColor = Color.parseColor(style.backgroundColorHex)
+        val primaryColor = Color.parseColor(config.primaryColorHex)
+        val secondaryColor = Color.parseColor(config.secondaryColorHex)
+        val textColor = Color.parseColor(config.textColorHex)
+        val bgColor = Color.parseColor(config.backgroundColorHex)
         
         // Typography
-        val typeface = when (style.fontFamily) {
+        val typeface = when (config.fontFamily) {
             "Serif" -> Typeface.SERIF
             "Monospace" -> Typeface.MONOSPACE
             else -> Typeface.DEFAULT
@@ -69,7 +69,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
         val dividerPaint = Paint().apply { color = Color.parseColor("#E0E0E0"); strokeWidth = 1f; style = Paint.Style.STROKE }
         
         // Layout Configs
-        val margin = style.marginSize
+        val margin = config.marginSize
         val contentW = PAGE_W - 2 * margin
         var page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
         var canvas = page.canvas
@@ -79,14 +79,14 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
         canvas.drawColor(bgColor)
 
         // Draw Header decoration if showHeader is true
-        if (style.showHeader) {
-            drawHeader(canvas, style.headerText, smallPaint, margin, dividerPaint)
+        if (config.showHeader) {
+            drawHeader(canvas, config.headerText, smallPaint, margin, dividerPaint)
             y += 25f
         }
 
         // ─── Cover / Title ───
         y += 40f
-        y = drawWrappedText(canvas, plan.title, titlePaint, margin, y, contentW, style.lineSpacing)
+        y = drawWrappedText(canvas, plan.title, titlePaint, margin, y, contentW, config.lineSpacing)
         y += 8f
         
         // Accent line under title
@@ -109,14 +109,14 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                 canvas = page.canvas
                 canvas.drawColor(bgColor)
                 y = margin
-                if (style.showHeader) {
-                    drawHeader(canvas, style.headerText, smallPaint, margin, dividerPaint)
+                if (config.showHeader) {
+                    drawHeader(canvas, config.headerText, smallPaint, margin, dividerPaint)
                     y += 25f
                 }
             }
 
             // Force Pagebreak if configured before H2 headings
-            if (style.enablePageBreaksBeforeH2 && section.heading.isNotBlank() && y > margin + 100f) {
+            if (config.enablePageBreaksBeforeH2 && section.heading.isNotBlank() && y > margin + 100f) {
                 drawPageDecorations(canvas, pageNum, style, smallPaint, dividerPaint)
                 doc.finishPage(page)
                 pageNum++
@@ -124,8 +124,8 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                 canvas = page.canvas
                 canvas.drawColor(bgColor)
                 y = margin
-                if (style.showHeader) {
-                    drawHeader(canvas, style.headerText, smallPaint, margin, dividerPaint)
+                if (config.showHeader) {
+                    drawHeader(canvas, config.headerText, smallPaint, margin, dividerPaint)
                     y += 25f
                 }
             }
@@ -139,15 +139,15 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                     canvas = page.canvas
                     canvas.drawColor(bgColor)
                     y = margin
-                    if (style.showHeader) {
-                        drawHeader(canvas, style.headerText, smallPaint, margin, dividerPaint)
+                    if (config.showHeader) {
+                        drawHeader(canvas, config.headerText, smallPaint, margin, dividerPaint)
                         y += 25f
                     }
                 }
                 "text", "bullet_list", "numbered_list", "quote", "code" -> {
                     if (section.heading.isNotBlank()) {
                         y += 10f
-                        y = drawWrappedText(canvas, section.heading, headingPaint, margin, y, contentW, style.lineSpacing)
+                        y = drawWrappedText(canvas, section.heading, headingPaint, margin, y, contentW, config.lineSpacing)
                         y += 6f
                     }
                     if (section.content.isNotBlank()) {
@@ -160,9 +160,9 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                                         doc.finishPage(page); pageNum++
                                         page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                                         canvas = page.canvas; canvas.drawColor(bgColor); y = margin
-                                        if (style.showHeader) { drawHeader(canvas, style.headerText, smallPaint, margin, dividerPaint); y += 25f }
+                                        if (config.showHeader) { drawHeader(canvas, config.headerText, smallPaint, margin, dividerPaint); y += 25f }
                                     }
-                                    y = drawWrappedText(canvas, "  •   ${item.trim()}", bodyPaint, margin + 15f, y, contentW - 15f, style.lineSpacing)
+                                    y = drawWrappedText(canvas, "  •   ${item.trim()}", bodyPaint, margin + 15f, y, contentW - 15f, config.lineSpacing)
                                     y += 2f
                                 }
                             }
@@ -174,9 +174,9 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                                         doc.finishPage(page); pageNum++
                                         page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                                         canvas = page.canvas; canvas.drawColor(bgColor); y = margin
-                                        if (style.showHeader) { drawHeader(canvas, style.headerText, smallPaint, margin, dividerPaint); y += 25f }
+                                        if (config.showHeader) { drawHeader(canvas, config.headerText, smallPaint, margin, dividerPaint); y += 25f }
                                     }
-                                    y = drawWrappedText(canvas, "  ${idx + 1}.  ${item.trim()}", bodyPaint, margin + 15f, y, contentW - 15f, style.lineSpacing)
+                                    y = drawWrappedText(canvas, "  ${idx + 1}.  ${item.trim()}", bodyPaint, margin + 15f, y, contentW - 15f, config.lineSpacing)
                                     y += 2f
                                 }
                             }
@@ -185,14 +185,14 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                                 val lines = section.content.split("\n")
                                 var blockHeight = 0f
                                 for (l in lines) {
-                                    blockHeight += measureTextLinesHeight(l, italicPaint, contentW - 24f, style.lineSpacing) + 3f
+                                    blockHeight += measureTextLinesHeight(l, italicPaint, contentW - 24f, config.lineSpacing) + 3f
                                 }
                                 if (y + blockHeight + 16f > PAGE_H - margin) {
                                     drawPageDecorations(canvas, pageNum, style, smallPaint, dividerPaint)
                                     doc.finishPage(page); pageNum++
                                     page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                                     canvas = page.canvas; canvas.drawColor(bgColor); y = margin
-                                    if (style.showHeader) { drawHeader(canvas, style.headerText, smallPaint, margin, dividerPaint); y += 25f }
+                                    if (config.showHeader) { drawHeader(canvas, config.headerText, smallPaint, margin, dividerPaint); y += 25f }
                                 }
                                 
                                 val quoteBgPaint = Paint().apply { color = Color.parseColor("#F5F7FA"); style = Paint.Style.FILL }
@@ -202,7 +202,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                                 
                                 var qY = y + 8f
                                 for (line in lines) {
-                                    qY = drawWrappedText(canvas, line.trim(), italicPaint, margin + 18f, qY, contentW - 24f, style.lineSpacing)
+                                    qY = drawWrappedText(canvas, line.trim(), italicPaint, margin + 18f, qY, contentW - 24f, config.lineSpacing)
                                     qY += 2f
                                 }
                                 y = qY + 12f
@@ -219,7 +219,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                                     doc.finishPage(page); pageNum++
                                     page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                                     canvas = page.canvas; canvas.drawColor(bgColor); y = margin
-                                    if (style.showHeader) { drawHeader(canvas, style.headerText, smallPaint, margin, dividerPaint); y += 25f }
+                                    if (config.showHeader) { drawHeader(canvas, config.headerText, smallPaint, margin, dividerPaint); y += 25f }
                                 }
                                 
                                 val codeBgPaint = Paint().apply { color = Color.parseColor("#F4F6F9"); style = Paint.Style.FILL }
@@ -244,7 +244,7 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                 }
                 "table" -> {
                     if (section.heading.isNotBlank()) {
-                        y += 10f; y = drawWrappedText(canvas, section.heading, headingPaint, margin, y, contentW, style.lineSpacing); y += 6f
+                        y += 10f; y = drawWrappedText(canvas, section.heading, headingPaint, margin, y, contentW, config.lineSpacing); y += 6f
                     }
                     val result = drawTable(doc, canvas, page, pageNum, style, section.tableData, margin, y, dividerPaint, smallPaint)
                     canvas = result.canvas; page = result.page; pageNum = result.pageNum; y = result.y
@@ -263,10 +263,10 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                             doc.finishPage(page); pageNum++
                             page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                             canvas = page.canvas; canvas.drawColor(bgColor); y = margin
-                            if (style.showHeader) { drawHeader(canvas, style.headerText, smallPaint, margin, dividerPaint); y += 25f }
+                            if (config.showHeader) { drawHeader(canvas, config.headerText, smallPaint, margin, dividerPaint); y += 25f }
                         }
                         if (section.heading.isNotBlank()) {
-                            y += 8f; y = drawWrappedText(canvas, section.heading, subheadingPaint, margin, y, contentW, style.lineSpacing); y += 6f
+                            y += 8f; y = drawWrappedText(canvas, section.heading, subheadingPaint, margin, y, contentW, config.lineSpacing); y += 6f
                         }
                         y = drawImage(canvas, imgBytes, margin, y, contentW, 200f)
                         y += 15f
@@ -293,24 +293,24 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
         canvas.drawLine(margin, y + 5f, PAGE_W - margin, y + 5f, linePaint)
     }
 
-    private fun drawPageDecorations(canvas: Canvas, num: Int, style: DocStyleConfig, paint: Paint, linePaint: Paint) {
+    private fun drawPageDecorations(canvas: Canvas, num: Int, config: DocStyleConfig, paint: Paint, linePaint: Paint) {
         val y = PAGE_H - 30f
         
         // Horizontal footer line
-        if (style.showFooter || style.showPageNumbers) {
-            canvas.drawLine(style.marginSize, y - 10f, PAGE_W - style.marginSize, y - 10f, linePaint)
+        if (config.showFooter || config.showPageNumbers) {
+            canvas.drawLine(config.marginSize, y - 10f, PAGE_W - config.marginSize, y - 10f, linePaint)
         }
         
         // Custom Footer Text
-        if (style.showFooter && style.footerText.isNotBlank()) {
-            canvas.drawText(style.footerText, style.marginSize, y, paint)
+        if (config.showFooter && config.footerText.isNotBlank()) {
+            canvas.drawText(config.footerText, config.marginSize, y, paint)
         }
         
         // Page Numbering
-        if (style.showPageNumbers) {
+        if (config.showPageNumbers) {
             val numStr = "Page $num"
             val width = paint.measureText(numStr)
-            canvas.drawText(numStr, PAGE_W - style.marginSize - width, y, paint)
+            canvas.drawText(numStr, PAGE_W - config.marginSize - width, y, paint)
         }
     }
 
@@ -357,13 +357,13 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
     private data class PageState(val canvas: Canvas, val page: PdfDocument.Page, val pageNum: Int, val y: Float)
 
     private fun drawWrappedTextMultiPage(
-        doc: PdfDocument, c: Canvas, p: PdfDocument.Page, pn: Int, style: DocStyleConfig,
+        doc: PdfDocument, c: Canvas, p: PdfDocument.Page, pn: Int, config: DocStyleConfig,
         text: String, paint: Paint, x: Float, startY: Float, maxW: Float, linePaint: Paint, labelPaint: Paint
     ): PageState {
         var canvas = c; var page = p; var pageNum = pn; var y = startY
         val paragraphs = text.split("\n")
-        val margin = style.marginSize
-        val bgColor = Color.parseColor(style.backgroundColorHex)
+        val margin = config.marginSize
+        val bgColor = Color.parseColor(config.backgroundColorHex)
 
         for (para in paragraphs) {
             val words = para.split(" ")
@@ -376,10 +376,10 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                         doc.finishPage(page); pageNum++
                         page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                         canvas = page.canvas; canvas.drawColor(bgColor); y = margin
-                        if (style.showHeader) { drawHeader(canvas, style.headerText, labelPaint, margin, linePaint); y += 25f }
+                        if (config.showHeader) { drawHeader(canvas, config.headerText, labelPaint, margin, linePaint); y += 25f }
                     }
                     canvas.drawText(line, x, y, paint)
-                    y += paint.textSize * style.lineSpacing
+                    y += paint.textSize * config.lineSpacing
                     line = word
                 } else {
                     line = test
@@ -391,10 +391,10 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                     doc.finishPage(page); pageNum++
                     page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                     canvas = page.canvas; canvas.drawColor(bgColor); y = margin
-                    if (style.showHeader) { drawHeader(canvas, style.headerText, labelPaint, margin, linePaint); y += 25f }
+                    if (config.showHeader) { drawHeader(canvas, config.headerText, labelPaint, margin, linePaint); y += 25f }
                 }
                 canvas.drawText(line, x, y, paint)
-                y += paint.textSize * style.lineSpacing
+                y += paint.textSize * config.lineSpacing
             }
             y += 4f // spacing between paragraphs
         }
@@ -402,19 +402,19 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
     }
 
     private fun drawTable(
-        doc: PdfDocument, c: Canvas, p: PdfDocument.Page, pn: Int, style: DocStyleConfig,
+        doc: PdfDocument, c: Canvas, p: PdfDocument.Page, pn: Int, config: DocStyleConfig,
         data: List<List<String>>, x: Float, startY: Float, linePaint: Paint, labelPaint: Paint
     ): PageState {
         if (data.isEmpty()) return PageState(c, p, pn, startY)
         var canvas = c; var page = p; var pageNum = pn; var y = startY
         val cols = data.maxOf { it.size }
-        val contentW = PAGE_W - 2 * style.marginSize
+        val contentW = PAGE_W - 2 * config.marginSize
         val colW = contentW / cols
         val rowH = 22f
-        val margin = style.marginSize
-        val bgColor = Color.parseColor(style.backgroundColorHex)
-        val primaryColor = Color.parseColor(style.primaryColorHex)
-        val textColor = Color.parseColor(style.textColorHex)
+        val margin = config.marginSize
+        val bgColor = Color.parseColor(config.backgroundColorHex)
+        val primaryColor = Color.parseColor(config.primaryColorHex)
+        val textColor = Color.parseColor(config.textColorHex)
 
         val tableBorderPaint = Paint().apply { color = Color.parseColor("#CCCCCC"); style = Paint.Style.STROKE; strokeWidth = 0.8f }
         val tableHeaderBg = Paint().apply { color = primaryColor.adjustAlpha(0.12f); style = Paint.Style.FILL }
@@ -429,13 +429,13 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                 doc.finishPage(page); pageNum++
                 page = doc.startPage(PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create())
                 canvas = page.canvas; canvas.drawColor(bgColor); y = margin
-                if (style.showHeader) { drawHeader(canvas, style.headerText, labelPaint, margin, linePaint); y += 25f }
+                if (config.showHeader) { drawHeader(canvas, config.headerText, labelPaint, margin, linePaint); y += 25f }
             }
             
             // Draw backgrounds based on style
             if (rowIdx == 0) {
                 canvas.drawRect(x, y, x + contentW, y + rowH, tableHeaderBg)
-            } else if (style.tableStyle == "Striped" && rowIdx % 2 == 1) {
+            } else if (config.tableStyle == "Striped" && rowIdx % 2 == 1) {
                 canvas.drawRect(x, y, x + contentW, y + rowH, tableStripedBg)
             }
             
@@ -444,9 +444,9 @@ class PdfEngine @Inject constructor(@ApplicationContext private val ctx: Context
                 val cx = x + colIdx * colW
                 
                 // Draw border
-                if (style.tableStyle == "Grid" || rowIdx == 0) {
+                if (config.tableStyle == "Grid" || rowIdx == 0) {
                     canvas.drawRect(cx, y, cx + colW, y + rowH, tableBorderPaint)
-                } else if (style.tableStyle == "Striped" || style.tableStyle == "HeaderColor") {
+                } else if (config.tableStyle == "Striped" || config.tableStyle == "HeaderColor") {
                     canvas.drawLine(cx, y + rowH, cx + colW, y + rowH, tableBorderPaint)
                 }
                 
